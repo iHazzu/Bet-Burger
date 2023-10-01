@@ -31,7 +31,7 @@ class BetCog(commands.Cog):
 
     @tasks.loop(seconds=5)
     async def update_loop(self):
-        now_arbs = await self.bot.bclient.get_arbs()
+        now_arbs = await Utils.execute_suppress(self.bot.bclient.get_arbs())
         new, updated = [], []
         for a in now_arbs:
             try:
