@@ -13,7 +13,7 @@ class BetClient:
         self.api_key: Optional[str] = None
         self.session: Optional[ClientSession] = None
         self.directories = {}
-        self.filters: List[Dict] = []
+        self.bot_filter = {}
         self.bookmakers = {}
         self.required_bookmaker_id: Optional[int] = None
         with open("core/bet_burger_api/headers.json") as f:
@@ -26,16 +26,14 @@ class BetClient:
         self.session = ClientSession()
         self.directories = await self._make_request("directories")
         bet_filters = await self._make_request("search_filters")
-        self.filters = [find(lambda f: f['title'] == "BOT-ALL", bet_filters)]
-        self.required_bookmaker_id = int(self.filters[0]['bookmakers2'][0])
-        for bookmaker_id in self.filters[0]["bookmakers1"]:
+        self.bot_filter = find(lambda f: f['title'] == "BOT", bet_filters)
+        self.required_bookmaker_id = self.bot_filter['bookmakers2'][0]
+        for bookmaker_id in self.bot_filter["bookmakers1"]:
             bookmaker_id = int(bookmaker_id)
             if bookmaker_id == self.required_bookmaker_id:
                 continue
             bookmaker = find(lambda b: b['id'] == bookmaker_id, self.directories["bookmakers"]["arbs"])
-            bookmaker_filter = find(lambda f: f['title'] == f"BOT-{bookmaker['name'].upper()}", bet_filters)
             self.bookmakers[bookmaker_id] = bookmaker
-            self.filters.append(bookmaker_filter)
 
     async def _make_request(self, endpoint: str, params: Optional[Dict] = None, domain="api-pr"):
         url = API_URL.format(domain, endpoint)
@@ -51,46 +49,38 @@ class BetClient:
 
     async def get_arbs(self) -> List[Arb]:
         arbs = []
-        for i, fil in enumerate(self.filters):
-            params = {'search_filter[]': [fil['id']], 'per_page': 20}
-            data = await self._make_request("arbs/pro_search", params, domain="rest-api-pr")
-            if len(data['arbs']) >= 20 and i == 0:
-                # The general filter reached the maximum number of arbs (20)
-                # So let's search using filters for each bookmaker separately
-                continue
-            for a in data["arbs"]:
-                bet1 = find(lambda b: b['id'] == a['bet1_id'], data["bets"])
-                bet2 = find(lambda b: b['id'] == a['bet2_id'], data["bets"])
-                if bet1['bookmaker_id'] == self.required_bookmaker_id:
-                    bet1, bet2 = bet2, bet1
-                sport = find(lambda m: m['id'] == a['sport_id'], self.directories['sports'])
-                bookmaker = self.bookmakers[bet1['bookmaker_id']]
-                if not bet1['bookmaker_event_direct_link']:
-                    error = "Invalid Bet Burger API_KEY."
-                    raise HTTPException(error)
-                if bookmaker['url'][-1] == bet1['bookmaker_event_direct_link'][0] == "/":
-                    link = bookmaker['url'][:-1] + bet1['bookmaker_event_direct_link']
-                else:
-                    link = bookmaker['url'] + bet1['bookmaker_event_direct_link']
-                market_dir = find(lambda m: m['id'] == bet1['market_and_bet_type'], self.directories['market_variations'])
-                market_text_model = self.market_acronyms[market_dir['title']]
-                market = market_text_model.replace("%s", str(bet1['market_and_bet_type_param']))
-                arb = Arb(
-                    event_name=bet1['event_name'],
-                    sport=sport['name'],
-                    bookmaker=bookmaker['name'],
-                    link=link,
-                    start_timestamp=a['started_at'],
-                    updated_timestamp=a['updated_at'],
-                    market=market,
-                    current_odds=bet1['koef'],
-                    oposition_odds=bet2['koef']
-                )
-                if arb not in arbs:
-                    arbs.append(arb)
-            if i == 0:
-                # General filter got all arbs
-                break
+        params = {'search_filter[]': [self.bot_filter['id']], 'per_page': 20}
+        data = await self._make_request("arbs/pro_search", params, domain="rest-api-pr")
+        for a in data["arbs"]:
+            bet1 = find(lambda b: b['id'] == a['bet1_id'], data["bets"])
+            bet2 = find(lambda b: b['id'] == a['bet2_id'], data["bets"])
+            if bet1['bookmaker_id'] == self.required_bookmaker_id:
+                bet1, bet2 = bet2, bet1
+            sport = find(lambda m: m['id'] == a['sport_id'], self.directories['sports'])
+            bookmaker = self.bookmakers[bet1['bookmaker_id']]
+            if not bet1['bookmaker_event_direct_link']:
+                error = "Invalid Bet Burger API_KEY."
+                raise HTTPException(error)
+            if bookmaker['url'][-1] == bet1['bookmaker_event_direct_link'][0] == "/":
+                link = bookmaker['url'][:-1] + bet1['bookmaker_event_direct_link']
+            else:
+                link = bookmaker['url'] + bet1['bookmaker_event_direct_link']
+            market_dir = find(lambda m: m['id'] == bet1['market_and_bet_type'], self.directories['market_variations'])
+            market_text_model = self.market_acronyms[market_dir['title']]
+            market = market_text_model.replace("%s", str(bet1['market_and_bet_type_param']))
+            arb = Arb(
+                event_name=bet1['event_name'],
+                sport=sport['name'],
+                bookmaker=bookmaker['name'],
+                link=link,
+                start_timestamp=a['started_at'],
+                updated_timestamp=a['updated_at'],
+                market=market,
+                current_odds=bet1['koef'],
+                oposition_odds=bet2['koef']
+            )
+            if arb not in arbs:
+                arbs.append(arb)
         return arbs
 
     async def close(self):
