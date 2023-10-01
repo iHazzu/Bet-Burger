@@ -27,7 +27,7 @@ class BetClient:
         self.directories = await self._make_request("directories")
         bet_filters = await self._make_request("search_filters")
         self.bot_filter = find(lambda f: f['title'] == "BOT", bet_filters)
-        self.required_bookmaker_id = self.bot_filter['bookmakers2'][0]
+        self.required_bookmaker_id = int(self.bot_filter['bookmakers2'][0])
         for bookmaker_id in self.bot_filter["bookmakers1"]:
             bookmaker_id = int(bookmaker_id)
             if bookmaker_id == self.required_bookmaker_id:

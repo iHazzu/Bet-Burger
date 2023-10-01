@@ -74,6 +74,5 @@ async def go(msg: discord.Message, msg_bet: Optional[discord.Message], arbs: Lis
     emb.add_field(name="Value (Edge)", value=f"{show_odd(value)}%", inline=True)
     emb.add_field(name="Market", value=arb.market, inline=True)
     await msg_bet.reply(embed=emb)
-    emb = msg_bet.embeds[0]
-    emb.title = PLACED_ORDER_TITLE
+    bet_emb.title = PLACED_ORDER_TITLE
     return await msg_bet.edit(embed=emb)
