@@ -29,7 +29,7 @@ async def go(interaction: Interaction):
 
     else:
         if not data[0][0]:
-            await bot.db.set("UPDATE users SET active=True WHERE id=%s", user.id)
+            await bot.db.set("UPDATE users SET active=True WHERE user_id=%s", user.id)
         else:
             emb = discord.Embed(
                 description="⚠ You have already activated the bot.",
