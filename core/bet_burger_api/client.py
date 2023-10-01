@@ -64,6 +64,8 @@ class BetClient:
                     bet1, bet2 = bet2, bet1
                 sport = find(lambda m: m['id'] == a['sport_id'], self.directories['sports'])
                 bookmaker = self.bookmakers[bet1['bookmaker_id']]
+                if not bet1['bookmaker_event_direct_link']:
+                    raise HTTPException("Invalid Bet Burger API_KEY.")
                 if bookmaker['url'][-1] == bet1['bookmaker_event_direct_link'][0] == "/":
                     link = bookmaker['url'][:-1] + bet1['bookmaker_event_direct_link']
                 else:
