@@ -49,7 +49,7 @@ class BetClient:
 
     async def get_arbs(self) -> List[Arb]:
         arbs = []
-        params = {'search_filter[]': [self.bot_filter['id']], 'per_page': 20, 'grouped': True}
+        params = {'search_filter[]': [self.bot_filter['id']], 'per_page': 20, 'grouped': 'True'}
         data = await self._make_request("arbs/pro_search", params, domain="rest-api-pr")
         for a in data["arbs"]:
             bet1 = find(lambda b: b['id'] == a['bet1_id'], data["bets"])
