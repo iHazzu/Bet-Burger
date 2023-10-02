@@ -97,8 +97,8 @@ def arrow_color(diff: int, koef_last_modified_at: int, scanned_at: int):
         return ""
     changed_timedelta = scanned_at - koef_last_modified_at
     if changed_timedelta > (10*60*1000):
-        return "↑Gray" if diff == 1 else "↓Gray"
+        return "⇧Gray" if diff == 1 else "⇩Gray"
     elif diff == 1:
-        return "↑Green"
+        return "⇧Green"
     else:
-        return "↓Red"
+        return "⇩Red"
