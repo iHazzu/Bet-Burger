@@ -68,16 +68,21 @@ class BetClient:
             market_dir = find(lambda m: m['id'] == bet1['market_and_bet_type'], self.directories['market_variations'])
             market_text_model = self.market_acronyms[market_dir['title']]
             market = market_text_model.replace("%s", str(bet1['market_and_bet_type_param']))
+            period_dir = find(lambda m: m['id'] == bet1['period_id'], self.directories['periods'])
             arb = Arb(
                 event_name=bet1['event_name'],
                 sport=sport['name'],
+                league=bet1['league_name'],
                 bookmaker=bookmaker['name'],
                 link=link,
                 start_timestamp=a['started_at'],
                 updated_timestamp=a['updated_at'],
                 market=market,
+                period=period_dir['title'],
                 current_odds=bet1['koef'],
-                oposition_odds=bet2['koef']
+                oposition_odds=bet2['koef'],
+                arrow=arrow_color(bet1['diff'], bet1['koef_last_modified_at'], bet1['scanned_at']),
+                oposition_arrow=arrow_color(bet2['diff'], bet2['koef_last_modified_at'], bet2['scanned_at'])
             )
             if arb not in arbs:
                 arbs.append(arb)
@@ -85,3 +90,15 @@ class BetClient:
 
     async def close(self):
         await self.session.close()
+
+
+def arrow_color(diff: int, koef_last_modified_at: int, scanned_at: int):
+    if not diff:
+        return ""
+    changed_timedelta = scanned_at - koef_last_modified_at
+    if changed_timedelta > (10*60*1000):
+        return "↑Gray" if diff == 1 else "↓Gray"
+    elif diff == 1:
+        return "↑Green"
+    else:
+        return "↓Red"

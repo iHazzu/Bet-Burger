@@ -31,7 +31,7 @@ class BetCog(commands.Cog):
 
     @tasks.loop(seconds=5)
     async def update_loop(self):
-        now_arbs = await Utils.execute_suppress(self.bot.bclient.get_arbs())
+        now_arbs = await Utils.execute_suppress(self.bot.bclient.get_arbs()) or []
         new, updated = [], []
         for a in now_arbs:
             try:
@@ -42,9 +42,12 @@ class BetCog(commands.Cog):
                 new.append(a)
         disappeared = [a for a in self.arbs if a not in now_arbs]
         self.arbs = now_arbs + disappeared
-        await Utils.execute_suppress(self.send_arbs(new))
-        await Utils.execute_suppress(self.update_arbs(updated))
-        await Utils.execute_suppress(self.delete_arbs(disappeared))
+        if new:
+            await Utils.execute_suppress(self.send_arbs(new))
+        if updated:
+            await Utils.execute_suppress(self.update_arbs(updated))
+        if disappeared:
+            await Utils.execute_suppress(self.delete_arbs(disappeared))
         if (self.update_loop.current_loop + 1) % 100 == 0:
             await Utils.execute_suppress(self.delete_orders_week_ago())
 

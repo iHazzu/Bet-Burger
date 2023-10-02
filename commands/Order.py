@@ -33,7 +33,7 @@ async def go(msg: discord.Message, msg_bet: Optional[discord.Message], arbs: Lis
         return None
 
     args = msg.content.split(" ")
-    if len(args) != 2:
+    if len(args) < 2:
         emb = discord.Embed(
             description=":warning: Provide the odds and the amount. Example: `1.50 300`.",
             colour=discord.Colour.red()
@@ -43,23 +43,39 @@ async def go(msg: discord.Message, msg_bet: Optional[discord.Message], arbs: Lis
 
     placed_odds = float(args[0])
     amount = float(args[1])
+    comment = " ".join(args[2:])
     value = ((1/placed_odds + 1/arb.oposition_odds) - 1) * 100
     match_time = datetime.utcfromtimestamp(arb.start_at)
+    updated_timedelta = (datetime.utcnow() - datetime.utcfromtimestamp(arb.upated_at))
     values = [
         str(msg.author),  # username
-        msg.created_at.strftime("%d/%m/%Y %H:%M"),  # date of bet
-        "No" if arb.disappeared_at is None else "Yes",  # after deletion
+        msg.created_at.strftime("%d/%m/%y %H:%M"),  # date of bet,
+        match_time.strftime("%d/%m/%y %H:%M"),
+        "",     # time to event (empty)
+        arb.sport,
+        arb.league,
         arb.event_name,
-        match_time.strftime("%d/%m/%Y %H:%M"),
         arb.market,
+        arb.period,
         show_odd(arb.current_odds),
+        show_odd(arb.oposition_odds),
         show_odd(arb.last_acceptable_odds),
         show_odd(placed_odds),
         amount,
+        "",     # soft bookie clv (empty)
+        "",     # soft bookie drip (empty)
+        "",     # pinn clv (empty)
+        "",     # pinn drop (empty)
         f"{show_odd(value)}%",
+        "",     # status (empty)
         arb.bookmaker,
+        arb.arrow,
+        arb.oposition_arrow,
+        updated_timedelta.seconds,
+        "No" if arb.disappeared_at is None else "Yes",  # after deletion,
+        comment
     ]
-    bot.worksheet.append_row(values, table_range="A1:K1")
+    bot.worksheet.append_row(values, table_range="A1:Z1")
     await bot.db.set('''
         INSERT INTO orders(user_id, event_slug)
         VALUES (%s, %s)
