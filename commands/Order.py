@@ -44,7 +44,7 @@ async def go(msg: discord.Message, msg_bet: Optional[discord.Message], arbs: Lis
     placed_odds = float(args[0])
     amount = float(args[1])
     comment = " ".join(args[2:])
-    value = (100/(1/placed_odds + 1/arb.oposition_odds) - 100)
+    value = 1/(1/placed_odds + 1/arb.oposition_odds) - 1
     match_time = datetime.utcfromtimestamp(arb.start_at)
     updated_timedelta = (datetime.utcnow() - datetime.utcfromtimestamp(arb.upated_at))
     values = [
@@ -59,14 +59,14 @@ async def go(msg: discord.Message, msg_bet: Optional[discord.Message], arbs: Lis
         arb.period,
         arb.current_odds,
         arb.oposition_odds,
-        arb.last_acceptable_odds,
+        round(arb.last_acceptable_odds, 2),
         placed_odds,
         amount,
         "",     # soft bookie clv (empty)
         "",     # soft bookie drip (empty)
         "",     # pinn clv (empty)
         "",     # pinn drop (empty)
-        f"{show_odd(value)}%",
+        round(value, 2),
         "",     # status (empty)
         arb.bookmaker,
         arb.arrow,
