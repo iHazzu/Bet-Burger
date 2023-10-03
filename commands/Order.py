@@ -44,7 +44,7 @@ async def go(msg: discord.Message, msg_bet: Optional[discord.Message], arbs: Lis
     placed_odds = float(args[0])
     amount = float(args[1])
     comment = " ".join(args[2:])
-    value = ((1/placed_odds + 1/arb.oposition_odds) - 1) * 100
+    value = (100/(1/placed_odds + 1/arb.oposition_odds) - 100)
     match_time = datetime.utcfromtimestamp(arb.start_at)
     updated_timedelta = (datetime.utcnow() - datetime.utcfromtimestamp(arb.upated_at))
     values = [
