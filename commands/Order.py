@@ -57,10 +57,10 @@ async def go(msg: discord.Message, msg_bet: Optional[discord.Message], arbs: Lis
         arb.event_name,
         arb.market,
         arb.period,
-        show_odd(arb.current_odds),
-        show_odd(arb.oposition_odds),
-        show_odd(arb.last_acceptable_odds),
-        show_odd(placed_odds),
+        arb.current_odds,
+        arb.oposition_odds,
+        arb.last_acceptable_odds,
+        placed_odds,
         amount,
         "",     # soft bookie clv (empty)
         "",     # soft bookie drip (empty)
