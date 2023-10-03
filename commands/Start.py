@@ -35,7 +35,7 @@ async def go(interaction: Interaction):
                 description="⚠ You have already activated the bot.",
                 colour=discord.Colour.red()
             )
-            return interaction.response.send_message(embed=emb)
+            return await interaction.response.send_message(embed=emb)
 
     emb = discord.Embed(
         title="✅ Connected Successfully",
