@@ -1,94 +1,122 @@
 import discord
-from core import Bot, Arb
+from core import Arb, Interaction
 from core.Utils import show_odd
-from typing import Optional, List
+from typing import Optional
 from datetime import datetime
 
-
 PLACED_ORDER_TITLE = ":large_orange_diamond: BET PLACED"
-deleted_emb = discord.Embed(
-    description=":warning: Sorry, this bet is no longer available.",
-    colour=discord.Colour.red()
-)
 
 
-async def go(msg: discord.Message, msg_bet: Optional[discord.Message], arbs: List[Arb], bot: Bot) -> Optional[discord.Message]:
-    await msg.channel.typing()
+class PlaceOrder(discord.ui.View):
+    def __init__(self, arb: Arb):
+        super().__init__(timeout=None)
+        self.arb = arb
 
-    if msg_bet is None:
+    @discord.ui.button(emoji="💶", label="Place Order", style=discord.ButtonStyle.blurple)
+    async def place_order(self, interaction: Interaction, button: discord.ui.Button):
+        bot = interaction.client
+        user = interaction.user
+        data = await bot.db.get("SELECT last_stake_amount FROM users WHERE user_id=%s", user.id)
+        if not data:
+            return
+
+        last_stake_amount = data[0][0]
+        form = OrderForm(self.arb, data[0][0])
+        await interaction.response.send_modal(form)
+        await form.wait()
+        await form.interaction.response.defer()
+
+        placed_odds = round(float(form.bookie_odds.value), 2)
+        chance_odds = round(float(form.chance_odds.value), 2)
+        stake_amount = round(float(form.stake_amount.value), 2)
+        comment = form.comment.value or ""
+        value = 1 / (1 / placed_odds + 1 / self.arb.oposition_odds) - 1
+        match_time = datetime.utcfromtimestamp(self.arb.start_at)
+        updated_timedelta = (datetime.utcnow() - datetime.utcfromtimestamp(self.arb.upated_at))
+
+        values = [
+            str(user),  # username
+            interaction.created_at.strftime("%d/%m/%y %H:%M"),  # date of bet,
+            match_time.strftime("%d/%m/%y %H:%M"),
+            "",  # time to event (empty)
+            self.arb.sport,
+            self.arb.league,
+            self.arb.event_name,
+            self.arb.market,
+            self.arb.period,
+            self.arb.current_odds,
+            self.arb.oposition_odds,
+            self.arb.last_acceptable_odds,
+            placed_odds,
+            chance_odds,
+            stake_amount,
+            "",  # soft bookie clv (empty)
+            "",  # soft bookie drop (empty)
+            "",  # pinn clv (empty)
+            "",  # pinn drop (empty)
+            value,
+            "",  # status (empty)
+            self.arb.bookmaker['name'],
+            self.arb.arrow,
+            self.arb.oposition_arrow,
+            updated_timedelta.seconds,
+            "No" if self.arb.disappeared_at is None else "Yes",  # after deletion,
+            comment
+        ]
+        bot.worksheet.append_row(values, table_range="A1:AA1")
+
+        await bot.db.set('''
+            INSERT INTO orders(user_id, bet_id, oposition_bet_id, bookmaker_id, match_time)
+            VALUES (%s, %s, %s, %s, %s)
+        ''', user.id, self.arb.bet_id, self.arb.oposition_bet_id, self.arb.bookmaker['id'], match_time)
+        if stake_amount != last_stake_amount:
+            await bot.db.set("UPDATE users SET last_stake_amount=%s WHERE user_id=%s", stake_amount, user.id)
+
+        bet_emb = interaction.message.embeds[0]
+        bet_emb.title = PLACED_ORDER_TITLE
+        button.disabled = True
+        bot.messages[interaction.message.id] = await interaction.message.edit(embed=bet_emb, view=self)
+
         emb = discord.Embed(
-            description=":warning: Sorry, this bet is no longer available.",
-            colour=discord.Colour.red()
+            title=f"✅ Your bet was saved!",
+            description=self.arb.slug,
+            colour=discord.Colour.green()
         )
-        await msg.reply(embed=emb)
-        return None
+        emb.add_field(name="Placed Odds", value=show_odd(placed_odds), inline=True)
+        emb.add_field(name="Chance Odds", value=show_odd(chance_odds), inline=True)
+        emb.add_field(name="Amount", value=f"{stake_amount:.2f}", inline=True)
+        emb.add_field(name="Value (Edge)", value=f"{show_odd(100*value)}%", inline=True)
+        emb.add_field(name="Market", value=self.arb.market, inline=True)
+        await form.interaction.followup.send(embed=emb)
 
-    if msg_bet.author != bot.user:
-        return
 
-    bet_emb = msg_bet.embeds[0]
-    event_slug = f"{bet_emb.fields[0].value}|{bet_emb.fields[2].value}"
-    arb: Arb = discord.utils.get(arbs, slug=event_slug)
-    if not arb:
-        return None
-
-    args = msg.content.split(" ")
-    if len(args) < 2:
-        emb = discord.Embed(
-            description=":warning: Provide the odds and the amount. Example: `1.50 300`.",
-            colour=discord.Colour.red()
-        )
-        await msg.reply(embed=emb)
-        return None
-
-    placed_odds = float(args[0])
-    amount = float(args[1])
-    comment = " ".join(args[2:])
-    value = 1/(1/placed_odds + 1/arb.oposition_odds) - 1
-    match_time = datetime.utcfromtimestamp(arb.start_at)
-    updated_timedelta = (datetime.utcnow() - datetime.utcfromtimestamp(arb.upated_at))
-    values = [
-        str(msg.author),  # username
-        msg.created_at.strftime("%d/%m/%y %H:%M"),  # date of bet,
-        match_time.strftime("%d/%m/%y %H:%M"),
-        "",     # time to event (empty)
-        arb.sport,
-        arb.league,
-        arb.event_name,
-        arb.market,
-        arb.period,
-        arb.current_odds,
-        arb.oposition_odds,
-        round(arb.last_acceptable_odds, 2),
-        placed_odds,
-        amount,
-        "",     # soft bookie clv (empty)
-        "",     # soft bookie drip (empty)
-        "",     # pinn clv (empty)
-        "",     # pinn drop (empty)
-        round(value, 2),
-        "",     # status (empty)
-        arb.bookmaker,
-        arb.arrow,
-        arb.oposition_arrow,
-        updated_timedelta.seconds,
-        "No" if arb.disappeared_at is None else "Yes",  # after deletion,
-        comment
-    ]
-    bot.worksheet.append_row(values, table_range="A1:Z1")
-    await bot.db.set('''
-        INSERT INTO orders(user_id, event_slug)
-        VALUES (%s, %s)
-    ''', msg.author.id, arb.slug)
-    emb = discord.Embed(
-        title=f"✅ Your bet was saved!",
-        description=event_slug,
-        colour=discord.Colour.green()
+class OrderForm(discord.ui.Modal):
+    bookie_odds = discord.ui.TextInput(
+        label="init",
+        style=discord.TextStyle.short,
     )
-    emb.add_field(name="Placed Odds", value=show_odd(placed_odds), inline=True)
-    emb.add_field(name="Amount", value=amount, inline=True)
-    emb.add_field(name="Value (Edge)", value=f"{show_odd(value)}%", inline=True)
-    emb.add_field(name="Market", value=arb.market, inline=True)
-    await msg_bet.reply(embed=emb)
-    bet_emb.title = PLACED_ORDER_TITLE
-    return await msg_bet.edit(embed=bet_emb)
+    chance_odds = discord.ui.TextInput(
+        label=f"2. Chance placed odds",
+        style=discord.TextStyle.short,
+    )
+    stake_amount = discord.ui.TextInput(
+        label=f"3. Stake amount placed",
+        style=discord.TextStyle.short,
+    )
+    comment = discord.ui.TextInput(
+        label=f"4. Additional comment",
+        style=discord.TextStyle.paragraph,
+        required=False,
+        placeholder="None"
+    )
+
+    def __init__(self, arb: Arb, default_stake: float):
+        self.bookie_odds.label = f"1. {arb.bookmaker['name']} placed odds"
+        self.bookie_odds.default = show_odd(arb.current_odds)
+        self.chance_odds.default = show_odd(arb.current_odds)
+        self.stake_amount.default = str(default_stake)
+        self.interaction: Optional[Interaction] = None
+        super().__init__(title=f"PLACE ORDER", timeout=120)
+
+    async def on_submit(self, interaction: Interaction):
+        self.interaction = interaction

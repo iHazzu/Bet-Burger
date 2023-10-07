@@ -4,10 +4,11 @@ from discord .ext import commands, tasks
 from discord import app_commands
 import datetime
 import asyncio
-from typing import List, Optional, Dict
+from typing import List
 from . import Stop, Start, Bookies, Script, Order
 from core import Bot, Utils, Arb, BOT_GUILD
 from contextlib import suppress
+from gspread import Cell
 
 
 DISAPPEARED_TITLE = ":alarm_clock: EVENT WILL DISAPPEAR IN ONE MINUTE"
@@ -16,21 +17,12 @@ DISAPPEARED_TITLE = ":alarm_clock: EVENT WILL DISAPPEAR IN ONE MINUTE"
 class BetCog(commands.Cog):
     def __init__(self, bot: Bot):
         self.bot = bot
-        self.messages: Dict[int, discord.Message] = {}
         self.arbs: List[Arb] = []
-        self.update_loop.start()
-
-    async def fetch_message(self, channel_id: int, message_id: int) -> Optional[discord.Message]:
-        msg = self.messages.get(message_id)
-        if msg is None:
-            channel = self.bot.get_channel(channel_id)
-            if channel:
-                with suppress(discord.NotFound):
-                    msg = await channel.fetch_message(message_id)
-        return msg
+        for loop in [self.update_arbs_loop, self.update_orders_loop]:
+            loop.start()
 
     @tasks.loop(seconds=5)
-    async def update_loop(self):
+    async def update_arbs_loop(self):
         now_arbs = await Utils.execute_suppress(self.bot.bclient.get_arbs()) or []
         new, updated = [], []
         for a in now_arbs:
@@ -48,18 +40,49 @@ class BetCog(commands.Cog):
             await Utils.execute_suppress(self.update_arbs(updated))
         if disappeared:
             await Utils.execute_suppress(self.delete_arbs(disappeared))
-        if (self.update_loop.current_loop + 1) % 100 == 0:
-            await Utils.execute_suppress(self.delete_orders_week_ago())
 
-    @update_loop.before_loop
-    async def wait_ready(self):
+    @update_arbs_loop.before_loop
+    async def before_update_arbs(self):
         await self.bot.wait_until_ready()
         data = await self.bot.db.get("SELECT channel_id, message_id FROM messages")
         for channel_id, message_id in data:
             with suppress(discord.NotFound):
                 lost_msg = await self.bot.get_channel(channel_id).fetch_message(message_id)
-                asyncio.create_task(lost_msg.delete())
+                asyncio.create_task(self.delete_message(lost_msg))
         await self.bot.db.set("DELETE FROM messages")
+
+    @tasks.loop(minutes=1)
+    async def update_orders_loop(self):
+        check_time = datetime.datetime.utcnow() + datetime.timedelta(seconds=30)
+        next_time = check_time + datetime.timedelta(minutes=1)
+        data = await self.bot.db.get('''
+            SELECT DISTINCT bet_id, oposition_bet_id, bookmaker_id, match_time
+            FROM orders
+            WHERE match_time>%s AND match_time<%s
+        ''', check_time, next_time)
+        for bet_id, oposition_bet_id, bookmaker_id, match_time in data:
+            bet = await self.bot.bclient.get_bookmaker_bet(bet_id, bookmaker_id)
+            oposition_bet = await self.bot.bclient.get_bookmaker_bet(oposition_bet_id, self.bot.bclient.oposition_bookmaker_id)
+            if not (bet and oposition_bet):
+                continue
+            cells = self.bot.worksheet.findall(bet['bookmaker_event_name'], in_column=7)
+            updated_match_time = datetime.datetime.strptime(bet['event_time'], "[%Y-%m-%d %H:%M:%S]")
+            to_update = []
+            if updated_match_time != match_time:
+                for cell in cells:
+                    to_update.append(Cell(cell.row, 16, round(bet['koef'], 2)))
+                    to_update.append(Cell(cell.row, 18, round(oposition_bet['koef'], 2)))
+            else:
+                for cell in cells:
+                    to_update.append(Cell(cell.row, 3, updated_match_time.strftime("%d/%m/%y %H:%M")))
+                await self.bot.db.set("UPDATE orders SET match_time=%s WHERE bet_id=%s", updated_match_time, bet_id)
+            self.bot.worksheet.update_cells(to_update)
+
+    @update_orders_loop.before_loop
+    async def before_update_orders(self):
+        day_ago = datetime.datetime.utcnow() - datetime.timedelta(days=1)
+        await self.bot.db.set("DELETE FROM orders WHERE match_time<%s", day_ago)
+        await self.bot.wait_until_ready()
 
     async def send_arbs(self, arbs: List[Arb]):
         send_tasks = []
@@ -71,19 +94,19 @@ class BetCog(commands.Cog):
                 AND NOT EXISTS(
                     SELECT True
                     FROM orders o
-                    WHERE o.user_id=u.user_id AND o.event_slug=%s
+                    WHERE o.user_id=u.user_id AND o.bet_id=%s
                 )
-            ''', arb.slug)
+            ''', arb.bet_id)
             for channel_id, bookies in data:
-                if bookies is None or arb.bookmaker in bookies.split(","):
+                if bookies is None or arb.bookmaker['name'] in bookies.split(","):
                     task = self.send_arb(channel_id, arb)
                     send_tasks.append(task)
         await asyncio.gather(*send_tasks)
 
     async def send_arb(self, channel_id: int, arb: Arb):
         channel = self.bot.get_channel(channel_id)
-        msg = await channel.send(embed=arb.to_embed())
-        self.messages[msg.id] = msg
+        msg = await channel.send(embed=arb.to_embed(), view=Order.PlaceOrder(arb))
+        self.bot.messages[msg.id] = msg
         await self.bot.db.set('''
             INSERT INTO messages (event_slug, channel_id, message_id)
             VALUES(%s, %s, %s)
@@ -98,13 +121,13 @@ class BetCog(commands.Cog):
         await asyncio.gather(*update_tasks)
 
     async def update_arb(self, channel_id: int, message_id: int, arb: Arb):
-        msg = await self.fetch_message(channel_id, message_id)
+        msg = await self.bot.fetch_message(channel_id, message_id)
         if not msg:
             return
         new_emb = arb.to_embed()
         if msg.embeds[0] == Order.PLACED_ORDER_TITLE:
             new_emb.title = Order.PLACED_ORDER_TITLE
-        self.messages[msg.id] = await msg.edit(embed=new_emb)
+        self.bot.messages[msg.id] = await msg.edit(embed=new_emb, view=Order.PlaceOrder(arb))
 
     async def delete_arbs(self, arbs: List[Arb]):
         delete_tasks = []
@@ -113,7 +136,7 @@ class BetCog(commands.Cog):
             data = await self.bot.db.get("SELECT channel_id, message_id FROM messages WHERE event_slug=%s", arb.slug)
             msgs = []
             for channel_id, message_id in data:
-                msg = await self.fetch_message(channel_id, message_id)
+                msg = await self.bot.fetch_message(channel_id, message_id)
                 if msg is not None:
                     msgs.append(msg)
             if arb.disappeared_at is None:
@@ -124,44 +147,18 @@ class BetCog(commands.Cog):
                 self.arbs.remove(arb)
                 await self.bot.db.set("DELETE FROM messages WHERE event_slug=%s", arb.slug)
                 for msg in msgs:
-                    delete_tasks.append(self.delete_arb(msg))
+                    delete_tasks.append(self.delete_message(msg))
         await asyncio.gather(*delete_tasks)
 
     async def warn_delete_arb(self, msg: discord.Message):
         emb = msg.embeds[0]
         emb.title = DISAPPEARED_TITLE
-        self.messages[msg.id] = await msg.edit(embed=emb)
+        self.bot.messages[msg.id] = await msg.edit(embed=emb)
 
-    async def delete_arb(self, msg: discord.Message):
-        self.messages.pop(msg.id)
+    async def delete_message(self, msg: discord.Message):
+        self.bot.messages.pop(msg.id, None)
         if msg.embeds[0].title != Order.PLACED_ORDER_TITLE:
             await msg.delete()
-
-    async def delete_orders_week_ago(self):
-        current_time = datetime.datetime.utcnow()
-        one_week_ago = current_time - datetime.timedelta(weeks=1)
-        await self.bot.db.set("DELETE FROM orders WHERE created < %s", one_week_ago)
-
-    @commands.Cog.listener()
-    async def on_message(self, message: discord.Message):
-        if message.author == self.bot.user:
-            return
-        if message.reference:
-            await self.try_place_order(message)
-
-    async def try_place_order(self, msg: discord.Message):
-        msg_bet = await self.fetch_message(msg.channel.id, msg.reference.message_id)
-        try:
-            new_msg_bet = await Order.go(msg, msg_bet, self.arbs, self.bot)
-        except Exception as error:
-            emb = discord.Embed(
-                description=f":warning: Sorry, an error occurred while saving your bet.```prolog\n{error}```",
-                colour=discord.Colour.red()
-            )
-            await msg.reply(embed=emb)
-        else:
-            if new_msg_bet is not None:
-                self.messages[msg_bet.id] = new_msg_bet
 
     @app_commands.command(name="start")
     @app_commands.guilds(BOT_GUILD)

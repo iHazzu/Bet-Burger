@@ -1,5 +1,5 @@
 import discord
-from typing import Optional
+from typing import Optional, Dict
 from ..Utils import show_odd
 
 
@@ -11,11 +11,13 @@ class HTTPException(Exception):
 class Arb:
     def __init__(
             self,
+            bet_id: str,
+            oposition_bet_id: str,
             event_name: str,
             sport: str,
             league: str,
-            bookmaker: str,
-            link: str,
+            bookmaker: Dict,
+            direct_link: str,
             start_timestamp: int,
             updated_timestamp: int,
             market: str,
@@ -25,11 +27,13 @@ class Arb:
             arrow: str,
             oposition_arrow: str
     ):
+        self.bet_id = bet_id
+        self.oposition_bet_id = oposition_bet_id
         self.event_name = event_name
         self.sport = sport
         self.league = league
         self.bookmaker = bookmaker
-        self.link = link
+        self.direct_link = direct_link
         self.start_at = start_timestamp
         self.upated_at = updated_timestamp
         self.disappeared_at: Optional[int] = None
@@ -55,21 +59,28 @@ class Arb:
 
     @property
     def slug(self):
-        return f"{self.event_name}|{self.bookmaker}"
+        return f"{self.event_name}|{self.bookmaker['name']}"
+
+    @property
+    def link(self):
+        if self.bookmaker['url'][-1] == self.direct_link[0] == "/":
+            return self.bookmaker['url'][:-1] + self.direct_link
+        else:
+            return self.bookmaker['url'] + self.direct_link
 
     def to_embed(self) -> discord.Embed:
         emb = discord.Embed(
-            title=f"🔔 {self.bookmaker.upper()} | {show_odd(self.current_odds)} | {show_odd(self.value)}%",
+            title=f"🔔 {self.bookmaker['name']} | {show_odd(self.current_odds)} | {show_odd(self.value)}%",
             colour=0x2a2ac7
         )
         emb.add_field(name="Event Name", value=self.event_name, inline=True)
         emb.add_field(name="Sport", value=self.sport, inline=True)
-        emb.add_field(name="Bookie", value=self.bookmaker, inline=True)
+        emb.add_field(name="Bookie", value=self.bookmaker['name'], inline=True)
         emb.add_field(name="Match Starts", value=f"<t:{self.start_at}:R>", inline=True)
         emb.add_field(name="Market", value=f"{self.market} + [{self.period}]" if self.period else self.market, inline=True)
         emb.add_field(name="Current Odds", value=show_odd(self.current_odds), inline=True)
         emb.add_field(name="Last Acceptable Odds", value=show_odd(self.last_acceptable_odds), inline=True)
         emb.add_field(name="Value (Edge)", value=f"{show_odd(self.value)}%", inline=True)
-        emb.add_field(name="Bet Link", value=f"[Go to {self.bookmaker}]({self.link})", inline=True)
+        emb.add_field(name="Bet Link", value=f"[Go to {self.bookmaker['name']}]({self.link})", inline=True)
         emb.set_thumbnail(url="https://cdn.discordapp.com/attachments/1131671133419212840/1131672060528165066/bet_img.png")
         return emb
