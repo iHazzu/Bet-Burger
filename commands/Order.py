@@ -1,8 +1,9 @@
 import discord
-from core import Arb, Interaction
+from core import Arb, Interaction, Bot
 from core.Utils import show_odd
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timedelta
+from gspread import Cell
 
 PLACED_ORDER_TITLE = ":large_orange_diamond: BET PLACED"
 
@@ -120,3 +121,30 @@ class OrderForm(discord.ui.Modal):
 
     async def on_submit(self, interaction: Interaction):
         self.interaction = interaction
+        
+        
+async def update_orders(bot: Bot):
+    check_time = datetime.utcnow() + timedelta(seconds=30)
+    next_time = check_time + timedelta(minutes=1)
+    data = await bot.db.get('''
+        SELECT DISTINCT bet_id, oposition_bet_id, bookmaker_id, match_time
+        FROM orders
+        WHERE match_time>%s AND match_time<%s
+    ''', check_time, next_time)
+    for bet_id, oposition_bet_id, bookmaker_id, match_time in data:
+        bet = await bot.bclient.get_bookmaker_bet(bet_id, bookmaker_id)
+        oposition_bet = await bot.bclient.get_bookmaker_bet(oposition_bet_id, bot.bclient.oposition_bookmaker_id)
+        if not (bet and oposition_bet):
+            continue
+        cells = bot.worksheet.findall(bet['bookmaker_event_name'], in_column=7)
+        updated_match_time = datetime.strptime(bet['event_time'], "[%Y-%m-%d %H:%M:%S]")
+        to_update = []
+        if updated_match_time != match_time:
+            for cell in cells:
+                to_update.append(Cell(cell.row, 16, round(bet['koef'], 2)))
+                to_update.append(Cell(cell.row, 18, round(oposition_bet['koef'], 2)))
+        else:
+            for cell in cells:
+                to_update.append(Cell(cell.row, 3, updated_match_time.strftime("%d/%m/%y %H:%M")))
+            await bot.db.set("UPDATE orders SET match_time=%s WHERE bet_id=%s", updated_match_time, bet_id)
+        bot.worksheet.update_cells(to_update)

@@ -8,7 +8,6 @@ from typing import List
 from . import Stop, Start, Bookies, Script, Order
 from core import Bot, Utils, Arb, BOT_GUILD
 from contextlib import suppress
-from gspread import Cell
 
 
 DISAPPEARED_TITLE = ":alarm_clock: EVENT WILL DISAPPEAR IN ONE MINUTE"
@@ -53,30 +52,7 @@ class BetCog(commands.Cog):
 
     @tasks.loop(minutes=1)
     async def update_orders_loop(self):
-        check_time = datetime.datetime.utcnow() + datetime.timedelta(seconds=30)
-        next_time = check_time + datetime.timedelta(minutes=1)
-        data = await self.bot.db.get('''
-            SELECT DISTINCT bet_id, oposition_bet_id, bookmaker_id, match_time
-            FROM orders
-            WHERE match_time>%s AND match_time<%s
-        ''', check_time, next_time)
-        for bet_id, oposition_bet_id, bookmaker_id, match_time in data:
-            bet = await self.bot.bclient.get_bookmaker_bet(bet_id, bookmaker_id)
-            oposition_bet = await self.bot.bclient.get_bookmaker_bet(oposition_bet_id, self.bot.bclient.oposition_bookmaker_id)
-            if not (bet and oposition_bet):
-                continue
-            cells = self.bot.worksheet.findall(bet['bookmaker_event_name'], in_column=7)
-            updated_match_time = datetime.datetime.strptime(bet['event_time'], "[%Y-%m-%d %H:%M:%S]")
-            to_update = []
-            if updated_match_time != match_time:
-                for cell in cells:
-                    to_update.append(Cell(cell.row, 16, round(bet['koef'], 2)))
-                    to_update.append(Cell(cell.row, 18, round(oposition_bet['koef'], 2)))
-            else:
-                for cell in cells:
-                    to_update.append(Cell(cell.row, 3, updated_match_time.strftime("%d/%m/%y %H:%M")))
-                await self.bot.db.set("UPDATE orders SET match_time=%s WHERE bet_id=%s", updated_match_time, bet_id)
-            self.bot.worksheet.update_cells(to_update)
+        await Utils.execute_suppress(Order.update_orders(self.bot))
 
     @update_orders_loop.before_loop
     async def before_update_orders(self):
