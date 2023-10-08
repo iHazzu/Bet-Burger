@@ -25,6 +25,8 @@ class PlaceOrder(discord.ui.View):
         form = OrderForm(self.arb, data[0][0])
         await interaction.response.send_modal(form)
         await form.wait()
+        if not form.interaction:
+            return
         await form.interaction.response.defer()
 
         placed_odds = round(float(form.bookie_odds.value), 2)
