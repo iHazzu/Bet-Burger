@@ -37,8 +37,8 @@ class PlaceOrder(discord.ui.View):
 
         values = [
             str(user),  # username
-            interaction.created_at.strftime("%d/%m/%y %H:%M"),  # date of bet,
-            match_time.strftime("%d/%m/%y %H:%M"),
+            (interaction.created_at + timedelta(hours=2)).strftime("%d/%m/%y %H:%M"),
+            (match_time + timedelta(hours=2)).strftime("%d/%m/%y %H:%M"),
             "",  # time to event (empty)
             self.arb.sport,
             self.arb.league,
@@ -80,14 +80,14 @@ class PlaceOrder(discord.ui.View):
 
         emb = discord.Embed(
             title=f"✅ Your bet was saved!",
-            description=self.arb.slug,
+            description=f"{self.arb.event_name} | {self.arb.bookmaker}",
             colour=discord.Colour.green()
         )
         emb.add_field(name="Placed Odds", value=show_odd(placed_odds), inline=True)
         emb.add_field(name="Chance Odds", value=show_odd(chance_odds), inline=True)
         emb.add_field(name="Amount", value=f"{stake_amount:.2f}", inline=True)
         emb.add_field(name="Value (Edge)", value=f"{show_odd(100*value)}%", inline=True)
-        emb.add_field(name="Market", value=self.arb.market, inline=True)
+        emb.add_field(name="Market", value=f"{self.arb.market}[{self.arb.period}]", inline=True)
         await form.interaction.followup.send(embed=emb)
 
 
@@ -134,8 +134,6 @@ async def update_orders(bot: Bot):
     for bet_id, oposition_bet_id, bookmaker_id, match_time in data:
         bet = await bot.bclient.get_bookmaker_bet(bet_id, bookmaker_id)
         oposition_bet = await bot.bclient.get_bookmaker_bet(oposition_bet_id, bot.bclient.oposition_bookmaker_id)
-        if not (bet and oposition_bet):
-            continue
         cells = bot.worksheet.findall(bet['bookmaker_event_name'], in_column=7)
         updated_match_time = datetime.strptime(bet['event_time'], "[%Y-%m-%d %H:%M:%S]")
         to_update = []
@@ -145,6 +143,6 @@ async def update_orders(bot: Bot):
                 to_update.append(Cell(cell.row, 18, round(oposition_bet['koef'], 2)))
         else:
             for cell in cells:
-                to_update.append(Cell(cell.row, 3, updated_match_time.strftime("%d/%m/%y %H:%M")))
+                to_update.append(Cell(cell.row, 3, (updated_match_time+timedelta(hours=2)).strftime("%d/%m/%y %H:%M")))
             await bot.db.set("UPDATE orders SET match_time=%s WHERE bet_id=%s", updated_match_time, bet_id)
         bot.worksheet.update_cells(to_update)

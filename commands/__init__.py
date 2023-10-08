@@ -118,7 +118,7 @@ class BetCog(commands.Cog):
             if arb.disappeared_at is None:
                 arb.disappeared_at = now_timestamp
                 for msg in msgs:
-                    delete_tasks.append(self.warn_delete_arb(msg))
+                    delete_tasks.append(self.warn_delete_arb(msg, arb))
             elif (now_timestamp - arb.disappeared_at) > 60:
                 self.arbs.remove(arb)
                 await self.bot.db.set("DELETE FROM messages WHERE event_slug=%s", arb.slug)
@@ -126,10 +126,10 @@ class BetCog(commands.Cog):
                     delete_tasks.append(self.delete_message(msg))
         await asyncio.gather(*delete_tasks)
 
-    async def warn_delete_arb(self, msg: discord.Message):
+    async def warn_delete_arb(self, msg: discord.Message, arb: Arb):
         emb = msg.embeds[0]
         emb.title = DISAPPEARED_TITLE
-        self.bot.messages[msg.id] = await msg.edit(embed=emb)
+        self.bot.messages[msg.id] = await msg.edit(embed=emb, view=Order.PlaceOrder(arb))
 
     async def delete_message(self, msg: discord.Message):
         self.bot.messages.pop(msg.id, None)
