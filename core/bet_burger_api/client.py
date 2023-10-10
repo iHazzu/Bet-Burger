@@ -4,6 +4,7 @@ from .types import HTTPException, Arb
 import json
 from discord.utils import find
 from random import choice
+from .formating import arrow_color, period_info
 
 
 API_URL = "https://{}.betburger.com/api/v1/{}"
@@ -77,7 +78,7 @@ class BetClient:
                     start_timestamp=a['started_at'],
                     updated_timestamp=a['updated_at'],
                     market=market,
-                    period=period_dir['title'],
+                    period=period_info(sport['id'], int(period_dir['identifier'])),
                     current_odds=bet1['koef'],
                     oposition_odds=bet2['koef'],
                     arrow=arrow_color(bet1['diff'], bet1['koef_last_modified_at'], bet1['scanned_at']),
@@ -93,15 +94,3 @@ class BetClient:
 
     async def close(self):
         await self.session.close()
-
-
-def arrow_color(diff: int, koef_last_modified_at: int, scanned_at: int) -> str:
-    if not diff:
-        return ""
-    changed_timedelta = scanned_at - koef_last_modified_at
-    if changed_timedelta > (10*60*1000):
-        return "⇧Gray" if diff == 1 else "⇩Gray"
-    elif diff == 1:
-        return "⇧Green"
-    else:
-        return "⇩Red"

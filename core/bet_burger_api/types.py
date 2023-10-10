@@ -63,10 +63,14 @@ class Arb:
 
     @property
     def link(self):
-        if self.bookmaker['url'][-1] == self.direct_link[0] == "/":
-            return self.bookmaker['url'][:-1] + self.direct_link
+        bookmaker_url = self.bookmaker['url'].replace("gm.ifortuna", "ifortuna")
+        if bookmaker_url == self.direct_link[0] == "/":
+            return bookmaker_url[:-1] + self.direct_link
         else:
-            return self.bookmaker['url'] + self.direct_link
+            return bookmaker_url + self.direct_link
+
+    def show_market_p(self) -> str:
+        return f"{self.market} + [{self.period}]"
 
     def to_embed(self) -> discord.Embed:
         emb = discord.Embed(
@@ -77,7 +81,7 @@ class Arb:
         emb.add_field(name="Sport", value=self.sport, inline=True)
         emb.add_field(name="Bookie", value=self.bookmaker['name'], inline=True)
         emb.add_field(name="Match Starts", value=f"<t:{self.start_at}:R>", inline=True)
-        emb.add_field(name="Market", value=f"{self.market} + [{self.period}]" if self.period else self.market, inline=True)
+        emb.add_field(name="Market", value=self.show_market_p(), inline=True)
         emb.add_field(name="Current Odds", value=show_odd(self.current_odds), inline=True)
         emb.add_field(name="Last Acceptable Odds", value=show_odd(self.last_acceptable_odds), inline=True)
         emb.add_field(name="Value (Edge)", value=f"{show_odd(self.value)}%", inline=True)

@@ -82,14 +82,14 @@ class PlaceOrder(discord.ui.View):
 
         emb = discord.Embed(
             title=f"✅ Your bet was saved!",
-            description=f"{self.arb.event_name} | {self.arb.bookmaker}",
+            description=f"{self.arb.event_name} | {self.arb.bookmaker['name']}",
             colour=discord.Colour.green()
         )
         emb.add_field(name="Placed Odds", value=show_odd(placed_odds), inline=True)
         emb.add_field(name="Chance Odds", value=show_odd(chance_odds), inline=True)
         emb.add_field(name="Amount", value=f"{stake_amount:.2f}", inline=True)
         emb.add_field(name="Value (Edge)", value=f"{show_odd(100*value)}%", inline=True)
-        emb.add_field(name="Market", value=f"{self.arb.market}[{self.arb.period}]", inline=True)
+        emb.add_field(name="Market", value=self.arb.show_market_p(), inline=True)
         await form.interaction.followup.send(embed=emb)
 
 
@@ -126,7 +126,7 @@ class OrderForm(discord.ui.Modal):
         
         
 async def update_orders(bot: Bot):
-    check_time = datetime.utcnow() + timedelta(seconds=30)
+    check_time = datetime.utcnow() + timedelta(minutes=2)
     next_time = check_time + timedelta(minutes=1)
     data = await bot.db.get('''
         SELECT DISTINCT bet_id, oposition_bet_id, bookmaker_id, match_time
