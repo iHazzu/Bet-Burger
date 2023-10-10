@@ -136,7 +136,7 @@ async def update_orders(bot: Bot, start_time: datetime, end_time: datetime):
         oposition_bet = await bot.bclient.get_bookmaker_bet(oposition_bet_id, bot.bclient.oposition_bookmaker_id)
         cells = bot.worksheet.findall(bet['bookmaker_event_name'], in_column=7)
         updated_match_time = datetime.strptime(bet['event_time'], "[%Y-%m-%d %H:%M:%S]")
-        local_match_time = updated_match_time + timedelta(hours=2)
+        show_match_time = (updated_match_time + timedelta(hours=2)).strftime("%d/%m/%y %H:%M")
         to_update = []
         if updated_match_time == match_time:
             for cell in cells:
@@ -144,6 +144,6 @@ async def update_orders(bot: Bot, start_time: datetime, end_time: datetime):
                 to_update.append(Cell(cell.row, 18, round(oposition_bet['koef'], 2)))
         else:
             for cell in cells:
-                to_update.append(Cell(cell.row, 3, local_match_time.strftime("%d/%m/%y %H:%M")))
+                to_update.append(Cell(cell.row, 3, show_match_time))
             await bot.db.set("UPDATE orders SET match_time=%s WHERE bet_id=%s", updated_match_time, bet_id)
         bot.worksheet.update_cells(to_update)
