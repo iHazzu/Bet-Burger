@@ -70,6 +70,8 @@ class Arb:
             return bookmaker_url + self.direct_link
 
     def show_market_p(self) -> str:
+        if not self.period:
+            return self.market
         return f"{self.market} + [{self.period}]"
 
     def to_embed(self) -> discord.Embed:

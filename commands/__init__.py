@@ -17,6 +17,7 @@ class BetCog(commands.Cog):
     def __init__(self, bot: Bot):
         self.bot = bot
         self.arbs: List[Arb] = []
+        self.last_update_orders_time = datetime.datetime.utcnow()
         for loop in [self.update_arbs_loop, self.update_orders_loop]:
             loop.start()
 
@@ -50,9 +51,11 @@ class BetCog(commands.Cog):
                 asyncio.create_task(self.delete_message(lost_msg))
         await self.bot.db.set("DELETE FROM messages")
 
-    @tasks.loop(minutes=1)
+    @tasks.loop(seconds=30)
     async def update_orders_loop(self):
-        await Utils.execute_suppress(Order.update_orders(self.bot))
+        end_time = datetime.datetime.utcnow() + datetime.timedelta(minutes=1)
+        await Utils.execute_suppress(Order.update_orders(self.bot, self.last_update_orders_time, end_time))
+        self.last_update_orders_time = end_time
 
     @update_orders_loop.before_loop
     async def before_update_orders(self):
