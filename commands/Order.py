@@ -64,9 +64,10 @@ class PlaceOrder(discord.ui.View):
             self.arb.oposition_arrow,
             updated_timedelta.seconds,
             "No" if self.arb.disappeared_at is None else "Yes",  # after deletion,
-            comment
+            comment,
+            self.arb.bet_id
         ]
-        bot.worksheet.append_row(values, table_range="A1:AA1")
+        bot.worksheet.append_row(values, table_range="A1:AB1")
 
         await bot.db.set('''
             INSERT INTO orders(user_id, bet_id, oposition_bet_id, bookmaker_id, match_time)
@@ -134,7 +135,7 @@ async def update_orders(bot: Bot, start_time: datetime, end_time: datetime):
     for bet_id, oposition_bet_id, bookmaker_id, match_time in data:
         bet = await bot.bclient.get_bookmaker_bet(bet_id, bookmaker_id)
         oposition_bet = await bot.bclient.get_bookmaker_bet(oposition_bet_id, bot.bclient.oposition_bookmaker_id)
-        cells = bot.worksheet.findall(bet['bookmaker_event_name'], in_column=7)
+        cells = bot.worksheet.findall(bet_id, in_column=28)
         updated_match_time = datetime.strptime(bet['event_time'], "[%Y-%m-%d %H:%M:%S]")
         show_match_time = (updated_match_time + timedelta(hours=2)).strftime("%d/%m/%y %H:%M")
         to_update = []
