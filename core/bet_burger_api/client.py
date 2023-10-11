@@ -4,7 +4,7 @@ from .types import HTTPException, Arb
 import json
 from discord.utils import find
 from random import choice
-from .formating import arrow_color, period_info
+from .formating import arrow_color, period_info, bk_koefs_filter
 
 
 API_URL = "https://{}.betburger.com/api/v1/{}"
@@ -29,15 +29,21 @@ class BetClient:
         self.directories = await self._make_request("directories", self.api_keys[0])
         for api_key in self.api_keys:
             account_filters = await self._make_request("search_filters", api_key)
+            bk_configs = (await self._make_request("user_bookmakers", api_key))["bookmakers"]
             bot_filter = find(lambda f: f['title'].startswith("BOT"), account_filters)
             bot_filter['api_key'] = api_key
+            bot_filter['bookmakers_koefs'] = []
             self.filters.append(bot_filter)
-            self.oposition_bookmaker_id = int(self.filters[0]['bookmakers2'][0])
+            self.oposition_bookmaker_id = int(bot_filter['bookmakers2'][0])
             for bookmaker_id in bot_filter["bookmakers1"]:
                 bookmaker_id = int(bookmaker_id)
                 if bookmaker_id == self.oposition_bookmaker_id:
                     continue
                 bookmaker = find(lambda b: b['id'] == bookmaker_id, self.directories["bookmakers"]["arbs"])
+                bk_config = find(lambda b: b['bookmaker_id'] == bookmaker_id, bk_configs)
+                bookmaker_koefs = bk_koefs_filter(bk_config)
+                if bookmaker_koefs:
+                    bot_filter['bookmakers_koefs'].append(bookmaker_koefs)
                 self.bookmakers[bookmaker_id] = bookmaker
 
     async def _make_request(self, endpoint: str, api_key: str, params: Optional[Dict] = None, domain="api-pr") -> Dict:
@@ -56,6 +62,8 @@ class BetClient:
         arbs = []
         for fil in self.filters:
             params = {'search_filter[]': [fil['id']], 'per_page': 20, 'grouped': 'True'}
+            if fil['bookmakers_koefs']:
+                params['bookmaker_koefs'] = ",".join(fil['bookmakers_koefs'])
             data = await self._make_request("arbs/pro_search", fil['api_key'], params, domain="rest-api-pr")
             for a in data["arbs"]:
                 bet1 = find(lambda b: b['id'] == a['bet1_id'], data["bets"])

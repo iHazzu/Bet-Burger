@@ -1,7 +1,9 @@
 import json
+from typing import Optional, Dict
 
-with open("core/bet_burger_api/period_names.json") as f:
-    period_names = json.load(f)
+
+with open("core/bet_burger_api/period_names.json") as file:
+    period_names = json.load(file)
 
 
 def arrow_color(diff: int, koef_last_modified_at: int, scanned_at: int) -> str:
@@ -62,3 +64,8 @@ def period_info(sport_id: int, identifier: int) -> str:
     else:
         n = f"{identifier} half"
     return period_names.get(n, n)
+
+
+def bk_koefs_filter(bk_data: Optional[Dict]) -> Optional[str]:
+    values = [0 if bk_data[k] is None else bk_data[k] for k in ['bookmaker_id', 'min_odds', 'max_odds', 'min_sum']]
+    return "-".join(str(v) for v in values) if any(values[1:]) else None

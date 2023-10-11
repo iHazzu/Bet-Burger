@@ -8,6 +8,9 @@ class HTTPException(Exception):
         super().__init__(text)
 
 
+FORTUNA_URL = "https://www.ifortuna.cz/sazeni/xxx/yyy/polonia-warszawa-bron-radom-MCZ"
+
+
 class Arb:
     def __init__(
             self,
@@ -63,11 +66,13 @@ class Arb:
 
     @property
     def link(self):
-        bookmaker_url = self.bookmaker['url'].replace("gm.ifortuna", "ifortuna")
-        if bookmaker_url == self.direct_link[0] == "/":
-            return bookmaker_url[:-1] + self.direct_link
+        if self.bookmaker['id'] == 80:
+            numbers = self.direct_link.split("MRO")[-1]
+            return FORTUNA_URL + numbers
+        if self.bookmaker['url'] == self.direct_link[0] == "/":
+            return self.bookmaker['url'][:-1] + self.direct_link
         else:
-            return bookmaker_url + self.direct_link
+            return self.bookmaker['url'] + self.direct_link
 
     def show_market_p(self) -> str:
         if not self.period:

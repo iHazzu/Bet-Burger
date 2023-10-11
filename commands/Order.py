@@ -1,7 +1,7 @@
 import discord
 from core import Arb, Interaction, Bot
 from core.Utils import show_odd
-from typing import Optional
+from typing import Optional, Dict, Union
 from datetime import datetime, timedelta
 from gspread import Cell
 
@@ -65,7 +65,7 @@ class PlaceOrder(discord.ui.View):
             updated_timedelta.seconds,
             "No" if self.arb.disappeared_at is None else "Yes",  # after deletion,
             comment,
-            self.arb.bet_id
+            f"{self.arb.bet_id}/{self.arb.bookmaker['id']}"
         ]
         bot.worksheet.append_row(values, table_range="A1:AB1")
 
@@ -133,18 +133,24 @@ async def update_orders(bot: Bot, start_time: datetime, end_time: datetime):
         WHERE match_time>=%s AND match_time<%s
     ''', start_time, end_time)
     for bet_id, oposition_bet_id, bookmaker_id, match_time in data:
+        cells = bot.worksheet.findall(f"{bet_id}/{bookmaker_id}", in_column=28)
         bet = await bot.bclient.get_bookmaker_bet(bet_id, bookmaker_id)
         oposition_bet = await bot.bclient.get_bookmaker_bet(oposition_bet_id, bot.bclient.oposition_bookmaker_id)
-        cells = bot.worksheet.findall(bet_id, in_column=28)
-        updated_match_time = datetime.strptime(bet['event_time'], "[%Y-%m-%d %H:%M:%S]")
-        show_match_time = (updated_match_time + timedelta(hours=2)).strftime("%d/%m/%y %H:%M")
+        updated_time = datetime.strptime(bet['event_time'], "[%Y-%m-%d %H:%M:%S]") if bet else match_time
         to_update = []
-        if updated_match_time == match_time:
+        if updated_time == match_time:
             for cell in cells:
-                to_update.append(Cell(cell.row, 16, round(bet['koef'], 2)))
-                to_update.append(Cell(cell.row, 18, round(oposition_bet['koef'], 2)))
+                to_update.append(Cell(cell.row, 16, get_bet_koef(bet)))
+                to_update.append(Cell(cell.row, 18,  get_bet_koef(oposition_bet)))
         else:
+            local_match_time = (updated_time + timedelta(hours=2)).strftime("%d/%m/%y %H:%M")
             for cell in cells:
-                to_update.append(Cell(cell.row, 3, show_match_time))
-            await bot.db.set("UPDATE orders SET match_time=%s WHERE bet_id=%s", updated_match_time, bet_id)
+                to_update.append(Cell(cell.row, 3, local_match_time))
+            await bot.db.set("UPDATE orders SET match_time=%s WHERE bet_id=%s", updated_time, bet_id)
         bot.worksheet.update_cells(to_update)
+
+
+def get_bet_koef(bet: Optional[Dict]) -> Union[str, int]:
+    if bet is None:
+        return "?"
+    return round(bet['koef'], 2)
