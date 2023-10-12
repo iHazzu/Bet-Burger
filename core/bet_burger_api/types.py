@@ -15,7 +15,6 @@ class Arb:
     def __init__(
             self,
             bet_id: str,
-            oposition_bet_id: str,
             event_name: str,
             sport: str,
             league: str,
@@ -31,7 +30,6 @@ class Arb:
             oposition_arrow: str
     ):
         self.bet_id = bet_id
-        self.oposition_bet_id = oposition_bet_id
         self.event_name = event_name
         self.sport = sport
         self.league = league

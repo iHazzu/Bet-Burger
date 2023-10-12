@@ -4,6 +4,7 @@ from core.Utils import show_odd
 from typing import Optional, Dict, Union
 from datetime import datetime, timedelta
 from gspread import Cell
+from discord.utils import find
 
 PLACED_ORDER_TITLE = ":large_orange_diamond: BET PLACED"
 
@@ -70,9 +71,9 @@ class PlaceOrder(discord.ui.View):
         bot.worksheet.append_row(values, table_range="A1:AB1")
 
         await bot.db.set('''
-            INSERT INTO orders(user_id, bet_id, oposition_bet_id, bookmaker_id, match_time)
-            VALUES (%s, %s, %s, %s, %s)
-        ''', user.id, self.arb.bet_id, self.arb.oposition_bet_id, self.arb.bookmaker['id'], match_time)
+            INSERT INTO orders(user_id, bet_id, bookmaker_id, match_time)
+            VALUES (%s, %s, %s, %s)
+        ''', user.id, self.arb.bet_id, self.arb.bookmaker['id'], match_time)
         if stake_amount != last_stake_amount:
             await bot.db.set("UPDATE users SET last_stake_amount=%s WHERE user_id=%s", stake_amount, user.id)
 
@@ -128,20 +129,23 @@ class OrderForm(discord.ui.Modal):
         
 async def update_orders(bot: Bot, start_time: datetime, end_time: datetime):
     data = await bot.db.get('''
-        SELECT DISTINCT bet_id, oposition_bet_id, bookmaker_id, match_time
+        SELECT DISTINCT bet_id, bookmaker_id, match_time
         FROM orders
         WHERE match_time>=%s AND match_time<%s
     ''', start_time, end_time)
-    for bet_id, oposition_bet_id, bookmaker_id, match_time in data:
+    for bet_id, bookmaker_id, match_time in data:
         cells = bot.worksheet.findall(f"{bet_id}/{bookmaker_id}", in_column=28)
-        bet = await bot.bclient.get_bookmaker_bet(bet_id, bookmaker_id)
-        oposition_bet = await bot.bclient.get_bookmaker_bet(oposition_bet_id, bot.bclient.oposition_bookmaker_id)
-        updated_time = datetime.strptime(bet['event_time'], "[%Y-%m-%d %H:%M:%S]") if bet else match_time
+        bets = await bot.bclient.get_bets(bet_id)
+        bet = find(lambda b: b['bookmaker_id'] == bookmaker_id, bets)
+        pinn_bet = find(lambda b: b['bookmaker_id'] == bot.bclient.oposition_bookmaker_id, bets)
+        updated_time = match_time
+        if bet:
+            updated_time = datetime.strptime(bet['event_time'], "[%Y-%m-%d %H:%M:%S]")
         to_update = []
         if updated_time == match_time:
             for cell in cells:
                 to_update.append(Cell(cell.row, 16, get_bet_koef(bet)))
-                to_update.append(Cell(cell.row, 18,  get_bet_koef(oposition_bet)))
+                to_update.append(Cell(cell.row, 18,  get_bet_koef(pinn_bet)))
         else:
             local_match_time = (updated_time + timedelta(hours=2)).strftime("%d/%m/%y %H:%M")
             for cell in cells:

@@ -16,7 +16,6 @@ CREATE TABLE users (
 CREATE TABLE orders (
     user_id	BIGINT NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
     bet_id TEXT NOT NULL,
-    oposition_bet_id TEXT NOT NULL,
     bookmaker_id SMALLINT NOT NULL,
     match_time TIMESTAMP NOT NULL
 );

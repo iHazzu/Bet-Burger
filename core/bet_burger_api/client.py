@@ -1,5 +1,5 @@
 from aiohttp import ClientSession
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Union
 from .types import HTTPException, Arb
 import json
 from discord.utils import find
@@ -46,7 +46,10 @@ class BetClient:
                     bot_filter['bookmakers_koefs'].append(bookmaker_koefs)
                 self.bookmakers[bookmaker_id] = bookmaker
 
-    async def _make_request(self, endpoint: str, api_key: str, params: Optional[Dict] = None, domain="api-pr") -> Dict:
+    async def _make_request(
+            self, endpoint: str, api_key: str,
+            params: Optional[Dict] = None, domain="api-pr"
+    ) -> Union[Dict, List[Dict]]:
         url = API_URL.format(domain, endpoint)
         params = params or {}
         params['access_token'] = api_key
@@ -77,7 +80,6 @@ class BetClient:
                 period_dir = find(lambda m: m['id'] == bet1['period_id'], self.directories['periods'])
                 arb = Arb(
                     bet_id=bet1['id'],
-                    oposition_bet_id=bet2['id'],
                     event_name=bet1['event_name'],
                     sport=sport['name'],
                     league=bet1['league_name'],
@@ -96,9 +98,8 @@ class BetClient:
                     arbs.append(arb)
         return arbs
 
-    async def get_bookmaker_bet(self, bet_id: str, bookmaker_id: int) -> Optional[Dict]:
-        data = await self._make_request(f"bets/{bet_id}/pro-same", choice(self.api_keys))
-        return find(lambda b: b['bookmaker_id'] == bookmaker_id, data)
+    async def get_bets(self, bet_id: str) -> List[Dict]:
+        return await self._make_request(f"bets/{bet_id}/pro-same", choice(self.api_keys))
 
     async def close(self):
         await self.session.close()
