@@ -104,9 +104,11 @@ class BetCog(commands.Cog):
         if not msg:
             return
         new_emb = arb.to_embed()
+        view = Order.PlaceOrder(arb)
         if msg.embeds[0] == Order.PLACED_ORDER_TITLE:
             new_emb.title = Order.PLACED_ORDER_TITLE
-        self.bot.messages[msg.id] = await msg.edit(embed=new_emb, view=Order.PlaceOrder(arb))
+            view.children[0].disabled = True
+        self.bot.messages[msg.id] = await msg.edit(embed=new_emb, view=view)
 
     async def delete_arbs(self, arbs: List[Arb]):
         delete_tasks = []

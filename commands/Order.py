@@ -40,8 +40,8 @@ class PlaceOrder(discord.ui.View):
 
         values = [
             str(user),  # username
-            (interaction.created_at + timedelta(hours=2)).strftime("%d/%m/%y %H:%M"),
-            (match_time + timedelta(hours=2)).strftime("%d/%m/%y %H:%M"),
+            (interaction.created_at + timedelta(hours=2)).strftime("%d.%m.%Y %H:%M:%S"),
+            (match_time + timedelta(hours=2)).strftime("%d.%m.%Y %H:%M:%S"),
             "",  # time to event (empty)
             self.arb.sport,
             self.arb.league,
