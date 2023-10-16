@@ -137,8 +137,9 @@ class BetCog(commands.Cog):
 
     async def warn_delete_arb(self, msg: discord.Message, arb: Arb):
         emb = msg.embeds[0]
-        emb.title = DISAPPEARED_TITLE
-        self.bot.messages[msg.id] = await msg.edit(embed=emb, view=Order.PlaceOrder(arb))
+        if emb.title != Order.PLACED_ORDER_TITLE:
+            emb.title = DISAPPEARED_TITLE
+            self.bot.messages[msg.id] = await msg.edit(embed=emb, view=Order.PlaceOrder(arb))
 
     async def delete_message(self, msg: discord.Message):
         self.bot.messages.pop(msg.id, None)
