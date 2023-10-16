@@ -76,6 +76,7 @@ class BetCog(commands.Cog):
                     WHERE o.user_id=u.user_id AND o.bet_id=%s
                 )
             ''', arb.bet_id)
+            print(arb.bet_id)
             for channel_id, bookies in data:
                 if bookies is None or arb.bookmaker['name'] in bookies.split(","):
                     task = self.send_arb(channel_id, arb)
