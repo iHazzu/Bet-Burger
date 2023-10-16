@@ -9,9 +9,10 @@ async def go(interaction: Interaction):
     await interaction.response.defer()
     bot = interaction.client
     user = interaction.user
-    data = await bot.db.get("SELECT active FROM users WHERE user_id=%s", user.id)
+    data = await bot.db.get("SELECT active, channel_id FROM users WHERE user_id=%s", user.id)
+    channel = bot.get_channel(data[0][1]) if data else None
 
-    if not data:
+    if not channel:
         category: discord.CategoryChannel = interaction.guild.get_channel(CATEGORY_ID)
         permissions = {
             interaction.guild.default_role: discord.PermissionOverwrite(view_channel=False),
@@ -19,9 +20,10 @@ async def go(interaction: Interaction):
         }
         channel = await category.create_text_channel(name=str(user), overwrites=permissions)
         await bot.db.set('''
+            DELETE FROM users WHERE user_id=%s;
             INSERT INTO users(user_id, username, channel_id)
             VALUES (%s, %s, %s)
-        ''', user.id, str(user), channel.id)
+        ''', user.id, user.id, str(user), channel.id)
         await channel.send(
             f"> 🔎 {user.mention} I will send you bets on this channel. "
             f"Use the `/bookies` command to filter the bookmakers you are interested in."
