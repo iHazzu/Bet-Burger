@@ -67,7 +67,7 @@ class Arb:
         if self.bookmaker['id'] == 80:
             numbers = self.direct_link.split("MRO")[-1]
             return FORTUNA_URL + numbers
-        if self.bookmaker['url'] == self.direct_link[0] == "/":
+        if self.bookmaker['url'][-1] == self.direct_link[0] == "/":
             return self.bookmaker['url'][:-1] + self.direct_link
         else:
             return self.bookmaker['url'] + self.direct_link
