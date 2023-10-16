@@ -84,6 +84,10 @@ class BetCog(commands.Cog):
 
     async def send_arb(self, channel_id: int, arb: Arb):
         channel = self.bot.get_channel(channel_id)
+        if channel is None:
+            # channel was deleted -> delete user
+            await self.bot.db.set("DELETE FROM users WHERE channel_id=%s", channel_id)
+            return
         msg = await channel.send(embed=arb.to_embed(), view=Order.PlaceOrder(arb))
         self.bot.messages[msg.id] = msg
         await self.bot.db.set('''

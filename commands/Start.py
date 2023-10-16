@@ -1,5 +1,5 @@
 import discord
-from core import Interaction
+from core import Interaction, Bot
 
 
 CATEGORY_ID = 1157803933968900256
@@ -43,3 +43,7 @@ async def go(interaction: Interaction):
         colour=discord.Colour.green()
     )
     await interaction.followup.send(embed=emb)
+
+
+async def deleted_user_channel(channel_id: int, bot: Bot):
+    await bot.db.set("DELETE FROM users WHERE channel_id=%s", channel_id)
