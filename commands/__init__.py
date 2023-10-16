@@ -76,7 +76,6 @@ class BetCog(commands.Cog):
                     WHERE o.user_id=u.user_id AND o.bet_id=%s
                 )
             ''', arb.bet_id)
-            print(arb.bet_id)
             for channel_id, bookies in data:
                 if bookies is None or arb.bookmaker['name'] in bookies.split(","):
                     task = self.send_arb(channel_id, arb)
@@ -110,7 +109,7 @@ class BetCog(commands.Cog):
             return
         new_emb = arb.to_embed()
         view = Order.PlaceOrder(arb)
-        if msg.embeds[0] == Order.PLACED_ORDER_TITLE:
+        if msg.embeds[0].title == Order.PLACED_ORDER_TITLE:
             new_emb.title = Order.PLACED_ORDER_TITLE
             view.children[0].disabled = True
         self.bot.messages[msg.id] = await msg.edit(embed=new_emb, view=view)

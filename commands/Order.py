@@ -81,8 +81,6 @@ class PlaceOrder(discord.ui.View):
         bet_emb.title = PLACED_ORDER_TITLE
         button.disabled = True
         bot.messages[interaction.message.id] = await interaction.message.edit(embed=bet_emb, view=self)
-        print(interaction.message.id)
-        print(bot.messages[interaction.message.id].embeds[0].title)
 
         emb = discord.Embed(
             title=f"✅ Your bet was saved!",
