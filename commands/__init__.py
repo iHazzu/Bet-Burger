@@ -46,9 +46,11 @@ class BetCog(commands.Cog):
         await self.bot.wait_until_ready()
         data = await self.bot.db.get("SELECT channel_id, message_id FROM messages")
         for channel_id, message_id in data:
-            with suppress(discord.NotFound):
-                lost_msg = await self.bot.get_channel(channel_id).fetch_message(message_id)
-                asyncio.create_task(self.delete_message(lost_msg))
+            channel = self.bot.get_channel(channel_id)
+            if channel is not None:
+                with suppress(discord.NotFound):
+                    lost_msg = await channel.fetch_message(message_id)
+                    asyncio.create_task(self.delete_message(lost_msg))
         await self.bot.db.set("DELETE FROM messages")
 
     @tasks.loop(seconds=30)
