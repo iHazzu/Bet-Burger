@@ -71,13 +71,13 @@ class BetCog(commands.Cog):
             data = await self.bot.db.get('''
                 SELECT u.channel_id, u.bookies
                 FROM users u
-                WHERE active=True
-                AND NOT EXISTS(
+                WHERE active AND
+                NOT EXISTS(
                     SELECT True
                     FROM orders o
-                    WHERE o.user_id=u.user_id AND o.bet_id=%s
+                    WHERE o.user_id=u.user_id AND o.slug=%s
                 )
-            ''', arb.bet_id)
+            ''', arb.slug)
             for channel_id, bookies in data:
                 if bookies is None or arb.bookmaker['name'] in bookies.split(","):
                     task = self.send_arb(channel_id, arb)

@@ -5,6 +5,7 @@ from typing import Optional, Dict, Union
 from datetime import datetime, timedelta
 from gspread import Cell
 from discord.utils import find
+from contextlib import suppress
 
 PLACED_ORDER_TITLE = ":large_orange_diamond: BET PLACED"
 
@@ -71,16 +72,17 @@ class PlaceOrder(discord.ui.View):
         bot.worksheet.append_row(values, table_range="A1:AB1")
 
         await bot.db.set('''
-            INSERT INTO orders(user_id, bet_id, bookmaker_id, match_time)
-            VALUES (%s, %s, %s, %s)
-        ''', user.id, self.arb.bet_id, self.arb.bookmaker['id'], match_time)
+            INSERT INTO orders(user_id, bet_id, bookmaker_id, match_time, slug)
+            VALUES (%s, %s, %s, %s, %s)
+        ''', user.id, self.arb.bet_id, self.arb.bookmaker['id'], match_time, self.arb.slug)
         if stake_amount != last_stake_amount:
             await bot.db.set("UPDATE users SET last_stake_amount=%s WHERE user_id=%s", stake_amount, user.id)
 
         bet_emb = interaction.message.embeds[0]
         bet_emb.title = PLACED_ORDER_TITLE
         button.disabled = True
-        bot.messages[interaction.message.id] = await interaction.message.edit(embed=bet_emb, view=self)
+        with suppress(discord.NotFound):
+            bot.messages[interaction.message.id] = await interaction.message.edit(embed=bet_emb, view=self)
 
         emb = discord.Embed(
             title=f"✅ Your bet was saved!",
