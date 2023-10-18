@@ -10,7 +10,7 @@ from core import Bot, Utils, Arb, BOT_GUILD
 from contextlib import suppress
 
 
-DISAPPEARED_TITLE = ":alarm_clock: EVENT WILL DISAPPEAR IN ONE MINUTE"
+DISAPPEARED_TITLE = ":alarm_clock: EVENT WILL DISAPPEAR IN 2 MINUTES"
 
 
 class BetCog(commands.Cog):
@@ -130,7 +130,7 @@ class BetCog(commands.Cog):
                 arb.disappeared_at = now_timestamp
                 for msg in msgs:
                     delete_tasks.append(self.warn_delete_arb(msg, arb))
-            elif (now_timestamp - arb.disappeared_at) > 60:
+            elif (now_timestamp - arb.disappeared_at) > 120:
                 self.arbs.remove(arb)
                 await self.bot.db.set("DELETE FROM messages WHERE event_slug=%s", arb.slug)
                 for msg in msgs:
