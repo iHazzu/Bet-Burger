@@ -28,10 +28,10 @@ async def main():
         gc = gspread.service_account(filename='google_credentials.json')
         spreadsheet = gc.open_by_key(env['SPREADSHEET_KEY'])
         bot.worksheet = spreadsheet.worksheet('Reportsheet')
-        await bot.db.connect(env['DATABASE_DSN'])
-        await bot.bclient.connect(env["API_KEYS"].split(","))
+        await bot.db.connect(env["DATABASE_DSN"])
+        await bot.bclient.connect(env["API_KEYS"].split(","), env["PREMIUM_API_KEY"])
         await bot.load_extension("commands")
-        await bot.start(env['DISCORD_BOT_TOKEN'])
+        await bot.start(env["DISCORD_BOT_TOKEN"])
     finally:
         await bot.terminate()
 
