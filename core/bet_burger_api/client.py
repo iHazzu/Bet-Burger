@@ -5,14 +5,17 @@ import json
 from discord.utils import find
 from random import choice
 from .formating import arrow_color, period_info, bk_koefs_filter
+from datetime import datetime
 
 
 API_URL = "https://{}.betburger.com/api/v1/{}"
+SAZKA = {'name': 'Sazka', 'id': 308, 'url': "https://www.sazka.cz/kurzove-sazky/sports/event/"}
 
 
 class BetClient:
     def __init__(self):
         self.api_keys: List[str] = []
+        self.premium_api_key: Optional[str] = None
         self.session: Optional[ClientSession] = None
         self.directories = {}
         self.filters: List[Dict] = []
@@ -23,8 +26,9 @@ class BetClient:
         with open("core/bet_burger_api/market_acronyms.json") as f:
             self.market_acronyms = json.load(f)
 
-    async def connect(self, api_keys: List[str]):
+    async def connect(self, api_keys: List[str], premium_api_key: str):
         self.api_keys = api_keys
+        self.premium_api_key = premium_api_key
         self.session = ClientSession()
         self.directories = await self._make_request("directories", self.api_keys[0])
         for api_key in self.api_keys:
@@ -45,6 +49,7 @@ class BetClient:
                 if bookmaker_koefs:
                     bot_filter['bookmakers_koefs'].append(bookmaker_koefs)
                 self.bookmakers[bookmaker_id] = bookmaker
+        self.bookmakers[SAZKA['id']] = SAZKA
 
     async def _make_request(
             self, endpoint: str, api_key: str,
@@ -96,6 +101,59 @@ class BetClient:
                 )
                 if arb not in arbs:
                     arbs.append(arb)
+        arbs = arbs + await self.get_sazka_arbs()
+        return arbs
+
+    async def get_sazka_arbs(self) -> List[Arb]:
+        params = {
+            'apiKey': self.premium_api_key,
+            'requiredBookmakerIds': [self.oposition_bookmaker_id],
+            'grouped': 'true',
+            'minPercent': 0.5
+        }
+        bk_ids = f"{self.oposition_bookmaker_id},{SAZKA['id']}"
+        url = f"https://api-pr.oddsmarket.org/v4/bookmakers/{bk_ids}/arbs"
+        async with self.session.get(url=url, params=params) as resp:
+            data = await resp.json()
+        current_timestamp = int(datetime.utcnow().timestamp() * 1000)
+        arbs = []
+        for arb in data["arbs"].values():
+            bets = []
+            for bet_id in arb["betIds"]:
+                bet = data["bets"][bet_id]
+                bet["id"] = bet_id
+                bet["bookmakerEvent"] = data["bookmakerEvents"][str(bet["bookmakerEventId"])]
+                bets.append(bet)
+            if bets[0]["bookmakerEvent"]["bookmakerId"] == self.oposition_bookmaker_id:
+                bets.reverse()
+            market_dir = find(lambda m: m['id'] == bets[0]["marketAndBetTypeId"], self.directories['market_variations'])
+            market_text_model = self.market_acronyms[market_dir["title"]]
+            market = market_text_model.replace("%s", str(bets[0]["marketAndBetTypeParam"]))
+            event = data["events"][str(arb["eventId"])]
+            league = data["leagues"][str(event["leagueId"])]
+            sport = data["sports"][str(league["sportId"])]
+            start_at = event["startDatetime"]
+            if (start_at - current_timestamp) > 3 * 24 * 60 * 60 * 1000:
+                # Only events that will start in 3 days
+                continue
+            arb = Arb(
+                bet_id=bets[0]["id"],
+                event_name=event["name"],
+                sport=sport['name'],
+                league=league["name"],
+                bookmaker=self.bookmakers[bets[0]["bookmakerEvent"]["bookmakerId"]],
+                direct_link=bets[0]["bookmakerEvent"]["rawId"],
+                start_timestamp=event["startDatetime"] // 1000,
+                updated_timestamp=bets[0]["updatedAt"] // 1000,
+                market=market,
+                period=period_info(league["sportId"], bets[0]["periodIdentifier"]),
+                current_odds=bets[0]["odds"],
+                oposition_odds=bets[1]["odds"],
+                arrow=arrow_color(bets[0]['diff'], bets[0]["updatedAt"], current_timestamp),
+                oposition_arrow=arrow_color(bets[1]['diff'], bets[1]["updatedAt"], current_timestamp)
+            )
+            if arb not in arbs:
+                arbs.append(arb)
         return arbs
 
     async def get_bets(self, bet_id: str) -> List[Dict]:

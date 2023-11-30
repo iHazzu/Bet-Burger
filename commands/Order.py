@@ -25,7 +25,10 @@ class PlaceOrder(discord.ui.View):
 
         last_stake_amount = data[0][0]
         form = OrderForm(self.arb, data[0][0])
-        await interaction.response.send_modal(form)
+        try:
+            await interaction.response.send_modal(form)
+        except discord.NotFound:
+            return
         await form.wait()
         if not form.interaction:
             return
