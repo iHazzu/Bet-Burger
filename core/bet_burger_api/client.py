@@ -132,8 +132,10 @@ class BetClient:
             event = data["events"][str(arb["eventId"])]
             league = data["leagues"][str(event["leagueId"])]
             sport = data["sports"][str(league["sportId"])]
-            start_at = event["startDatetime"]
-            if (start_at - current_timestamp) > 3 * 24 * 60 * 60 * 1000:
+            if bets[0]["odds"] > 2.50:
+                # Only show bets with odds less than 2.5
+                continue
+            if (event["startDatetime"] - current_timestamp) > 3 * 24 * 60 * 60 * 1000:
                 # Only events that will start in 3 days
                 continue
             arb = Arb(
