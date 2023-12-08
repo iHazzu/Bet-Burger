@@ -130,7 +130,7 @@ class BetCog(commands.Cog):
 
     async def delete_arbs(self, arbs: List[Arb]):
         delete_tasks = []
-        now_timestamp = int(datetime.datetime.utcnow().timestamp())
+        now_timestamp = int(datetime.utcnow().timestamp())
         for arb in arbs:
             data = await self.bot.db.get("SELECT channel_id, message_id FROM messages WHERE event_slug=%s", arb.slug)
             msgs = []
