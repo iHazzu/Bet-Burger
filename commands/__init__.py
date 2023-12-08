@@ -28,7 +28,7 @@ class BetCog(commands.Cog):
         for a in now_arbs:
             try:
                 i = self.arbs.index(a)
-                if self.arbs[i].upated_at != a.upated_at or self.arbs[i].disappeared_at:
+                if self.arbs[i].value != a.value or self.arbs[i].disappeared_at:
                     updated.append(a)
             except ValueError:
                 new.append(a)
@@ -113,7 +113,7 @@ class BetCog(commands.Cog):
         edited_age = now - (msg.edited_at or msg.created_at)
         msg_age = now - msg.created_at
         if msg_age < timedelta(minutes=5):
-            if edited_age < timedelta(seconds=20):
+            if edited_age < timedelta(seconds=10):
                 return
         elif msg_age < timedelta(hours=1):
             if edited_age < timedelta(minutes=1):
