@@ -107,7 +107,7 @@ class BetCog(commands.Cog):
 
     async def update_arb(self, channel_id: int, message_id: int, arb: Arb):
         msg = await self.bot.fetch_message(channel_id, message_id)
-        now = datetime.utcnow()
+        now = discord.utils.utcnow()
         if not msg:
             return
         edited_age = now - (msg.edited_at or msg.created_at)
