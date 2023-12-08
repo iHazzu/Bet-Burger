@@ -2,7 +2,7 @@
 import discord
 from discord .ext import commands, tasks
 from discord import app_commands
-import datetime
+from datetime import datetime, timedelta
 import asyncio
 from typing import List
 from . import Stop, Start, Bookies, Script, Order
@@ -17,7 +17,7 @@ class BetCog(commands.Cog):
     def __init__(self, bot: Bot):
         self.bot = bot
         self.arbs: List[Arb] = []
-        self.last_update_orders_time = datetime.datetime.utcnow()
+        self.last_update_orders_time = datetime.utcnow()
         for loop in [self.update_arbs_loop, self.update_orders_loop]:
             loop.start()
 
@@ -55,13 +55,13 @@ class BetCog(commands.Cog):
 
     @tasks.loop(seconds=30)
     async def update_orders_loop(self):
-        end_time = datetime.datetime.utcnow() + datetime.timedelta(minutes=1)
+        end_time = datetime.utcnow() + timedelta(minutes=1)
         await Utils.execute_suppress(Order.update_orders(self.bot, self.last_update_orders_time, end_time))
         self.last_update_orders_time = end_time
 
     @update_orders_loop.before_loop
     async def before_update_orders(self):
-        day_ago = datetime.datetime.utcnow() - datetime.timedelta(days=1)
+        day_ago = datetime.utcnow() - timedelta(days=1)
         await self.bot.db.set("DELETE FROM orders WHERE match_time<%s", day_ago)
         await self.bot.wait_until_ready()
 
@@ -107,8 +107,20 @@ class BetCog(commands.Cog):
 
     async def update_arb(self, channel_id: int, message_id: int, arb: Arb):
         msg = await self.bot.fetch_message(channel_id, message_id)
+        now = datetime.utcnow()
         if not msg:
             return
+        edited_age = now - (msg.edited_at or msg.created_at)
+        msg_age = now - msg.created_at
+        if msg_age < timedelta(minutes=5):
+            if edited_age < timedelta(seconds=20):
+                return
+        elif msg_age < timedelta(hours=1):
+            if edited_age < timedelta(minutes=1):
+                return
+        else:
+            if edited_age < timedelta(minutes=5):
+                return
         new_emb = arb.to_embed()
         view = Order.PlaceOrder(arb)
         if msg.embeds[0].title == Order.PLACED_ORDER_TITLE:
