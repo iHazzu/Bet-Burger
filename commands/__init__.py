@@ -50,8 +50,9 @@ class BetCog(commands.Cog):
             if channel is not None:
                 with suppress(discord.NotFound):
                     lost_msg = await channel.fetch_message(message_id)
-                    asyncio.create_task(self.delete_message(lost_msg))
-        await self.bot.db.set("DELETE FROM messages")
+                    self.bot.messages[lost_msg.id] = lost_msg
+                    continue
+            await self.bot.db.set("DELETE FROM messages WHERE message_id=%s", message_id)
 
     @tasks.loop(seconds=30)
     async def update_orders_loop(self):
@@ -112,15 +113,13 @@ class BetCog(commands.Cog):
             return
         edited_age = now - (msg.edited_at or msg.created_at)
         msg_age = now - msg.created_at
-        if msg_age < timedelta(minutes=5):
-            if edited_age < timedelta(seconds=10):
-                return
-        elif msg_age < timedelta(hours=1):
-            if edited_age < timedelta(minutes=1):
-                return
-        else:
-            if edited_age < timedelta(minutes=5):
-                return
+        if msg.embeds[0].title != DISAPPEARED_TITLE:
+            if msg_age < timedelta(minutes=10):
+                if edited_age < timedelta(seconds=20):
+                    return
+            else:
+                if edited_age < timedelta(minutes=2):
+                    return
         new_emb = arb.to_embed()
         view = Order.PlaceOrder(arb)
         if msg.embeds[0].title == Order.PLACED_ORDER_TITLE:
