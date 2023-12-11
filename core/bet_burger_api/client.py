@@ -112,7 +112,7 @@ class BetClient:
             'minPercent': 0.5
         }
         bk_ids = f"{self.oposition_bookmaker_id},{SAZKA['id']}"
-        url = f"https://api-pr.oddsmarket.org/v4/bookmakers/{bk_ids}/arbs"
+        url = f"https://api-lv.oddsmarket.org/v4/bookmakers/{bk_ids}/arbs"
         async with self.session.get(url=url, params=params) as resp:
             data = await resp.json()
         current_timestamp = int(datetime.utcnow().timestamp() * 1000)
